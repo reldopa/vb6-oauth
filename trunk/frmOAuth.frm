@@ -63,7 +63,7 @@ End Function
 
 Public Function ClearCredentials() As Boolean
     If fso.FileExists(tokenFile) Then
-        fso.DeleteFile
+        fso.DeleteFile tokenFile
         ClearCredentials = True
     Else
         ClearCredentials = False

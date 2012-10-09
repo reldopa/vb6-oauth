@@ -70,7 +70,7 @@ Public Function ClearCredentials() As Boolean
     End If
 End Function
 
-Function dict2string(dic As Dictionary) As String
+Function dict2string(dic As Scripting.Dictionary) As String
     Dim key
     For Each key In dic.Keys
         dict2string = dict2string & "&" & key & "=" & dic.Item(key)
@@ -123,7 +123,7 @@ Public Function GenerateSignatureBase(URL As MSHTML.HTMLAnchorElement, consumerK
     If "" = httpMethod Then Err.Raise 5, ("httpMethod")
     normalizedUrl = ""
     normalizedRequestParameters = ""
-    Dim parameters As Dictionary
+    Dim parameters As Scripting.Dictionary
     Set parameters = GetQueryParameters(URL.Search)
     parameters.Add OAUTH_VERSION, "1.0"
     parameters.Add OAUTH_NONCE, nonce
@@ -183,13 +183,13 @@ End Function
 '        /// </summary>
 '        /// <param name="parameters">The query string part of the Url</param>
 '        /// <returns>A list of QueryParameter each containing the parameter name and value</returns>
-Private Function GetQueryParameters(parameters As String) As Dictionary
+Private Function GetQueryParameters(parameters As String) As Scripting.Dictionary
 
     If Left$(parameters, 1) = "?" Then
         parameters = Mid$(parameters, 2)
     End If
 
-    Dim result As New Dictionary
+    Dim result As New Scripting.Dictionary
     Dim temp
     If (parameters <> "") Then
         Dim p As Variant
@@ -215,7 +215,7 @@ Function HandleToken()
     If http.status = 200 Then
         Dim ts As TextStream
         Set ts = fso.CreateTextFile(tokenFile, True)
-        Dim accessDict As Dictionary
+        Dim accessDict As Scripting.Dictionary
         Set accessDict = str2dict(http.responseText)
         Token = URLEncode(accessDict(OAUTH_TOKEN))
         ts.WriteLine Token
@@ -282,7 +282,7 @@ Public Function Login()
 
 
     verifierURL = WebBrowser1.LocationURL
-    Dim verifier As Dictionary
+    Dim verifier As Scripting.Dictionary
     Set verifier = str2dict(Mid$(MakeURL(verifierURL).Search, 2))
     SignedRequest URL_ACCESS_TOKEN & "?" & OAUTH_VERIFIER & "=" & verifier(OAUTH_VERIFIER), True
     HandleToken
@@ -301,7 +301,7 @@ End Function
 '        /// <param name="parameters">The list of parameters already sorted</param>
 '        /// <returns>a string representing the normalized parameters</returns>
 
-Friend Function NormalizeRequestParameters(SortedParameters As Dictionary) As _
+Friend Function NormalizeRequestParameters(SortedParameters As Scripting.Dictionary) As _
        String
     Dim sb As String
     Dim i As Integer
@@ -399,8 +399,8 @@ Function SortDictionary(objDict)
 
 End Function
 
-Function str2dict(str As String) As Dictionary
-    Set str2dict = New Dictionary
+Function str2dict(str As String) As Scripting.Dictionary
+    Set str2dict = New Scripting.Dictionary
     Dim kvs As Variant
     kvs = Split(str, "&")
     Dim i As Integer

@@ -15,6 +15,7 @@ Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 Option Explicit
 'Version 1.0
+Private ie As New InternetExplorer
 Private fso As New FileSystemObject
 Private tokenFile As String
 Private Declare Sub GetSystemTime Lib "kernel32.dll" (lpSystemTime As SYSTEMTIME)
@@ -37,9 +38,9 @@ Public http As WinHttpRequest
 Private m_resource As String
 Attribute m_resource.VB_VarHelpID = -1
 Const EXT_TOKEN As String = ".tok"
-Private Const CONSUMER_KEY As String = "<insert here>"    'change
-Private Const CONSUMER_SECRET As String = "<insert here>"    'change
-Const guid As String = "F317EA682B9141af8D95007A5C73F9CE"
+Private Const CONSUMER_KEY As String = "key"    'change
+Private Const CONSUMER_SECRET As String = "secret"    'change
+Const guid As String = "F317EA682B9141af8D95007A5C73F9CE" 'in case multiple ones are running
 
 Private Function Base64_HMACSHA1(ByVal sTextToHash As String, ByVal sSharedSecretKey As String)
 
@@ -68,9 +69,11 @@ Public Function ClearCredentials() As Boolean
     Else
         ClearCredentials = False
     End If
+    Token = ""
+    TokenSecret = ""
 End Function
 
-Function dict2string(dic As Scripting.Dictionary) As String
+Function dict2string(dic As Dictionary) As String
     Dim key
     For Each key In dic.Keys
         dict2string = dict2string & "&" & key & "=" & dic.Item(key)
@@ -115,7 +118,7 @@ End Function
 '/// <param name="httpMethod">The http method used. Must be a valid HTTP method verb (POST,GET,PUT, etc)</param>
 '/// <param name="signatureType">The signature type. To use the default values use <see cref="OAuthBase.SignatureTypes">OAuthBase.SignatureTypes</see>.</param>
 '/// <returns>The signature base</returns>
-Public Function GenerateSignatureBase(URL As MSHTML.HTMLAnchorElement, consumerKey As String, Token As String, httpMethod As String, _
+Public Function GenerateSignatureBase(Url As MSHTML.HTMLAnchorElement, consumerKey As String, Token As String, httpMethod As String, _
                                       timeStamp As String, nonce As String, hmac As Boolean, ByRef normalizedUrl As String, ByRef normalizedRequestParameters As String) As String
 
     On Error GoTo GenerateSignatureBase_Error
@@ -123,8 +126,8 @@ Public Function GenerateSignatureBase(URL As MSHTML.HTMLAnchorElement, consumerK
     If "" = httpMethod Then Err.Raise 5, ("httpMethod")
     normalizedUrl = ""
     normalizedRequestParameters = ""
-    Dim parameters As Scripting.Dictionary
-    Set parameters = GetQueryParameters(URL.Search)
+    Dim parameters As Dictionary
+    Set parameters = GetQueryParameters(Url.Search)
     parameters.Add OAUTH_VERSION, "1.0"
     parameters.Add OAUTH_NONCE, nonce
     parameters.Add OAUTH_TIMESTAMP, timeStamp
@@ -132,11 +135,11 @@ Public Function GenerateSignatureBase(URL As MSHTML.HTMLAnchorElement, consumerK
     parameters.Add OAUTH_CONSUMER_KEY, CONSUMER_KEY
     If Token <> "" Then parameters.Add OAUTH_TOKEN, Token
     SortDictionary parameters
-    normalizedUrl = URL.Protocol & "//" & URL.hostname
-    If (Not ((URL.Protocol = "http:" And URL.Port = 80) Or (URL.Protocol = "https:" And URL.Port = 443))) Then
-        normalizedUrl = normalizedUrl & ":" & URL.Port
+    normalizedUrl = Url.Protocol & "//" & Url.hostname
+    If (Not ((Url.Protocol = "http:" And Url.Port = 80) Or (Url.Protocol = "https:" And Url.Port = 443))) Then
+        normalizedUrl = normalizedUrl & ":" & Url.Port
     End If
-    normalizedUrl = normalizedUrl & "/" & URL.pathname
+    normalizedUrl = normalizedUrl & "/" & Url.pathname
     normalizedRequestParameters = NormalizeRequestParameters(parameters)
     GenerateSignatureBase = UCase$(httpMethod) & "&" _
                           & URLEncode(normalizedUrl) & "&" _
@@ -183,13 +186,13 @@ End Function
 '        /// </summary>
 '        /// <param name="parameters">The query string part of the Url</param>
 '        /// <returns>A list of QueryParameter each containing the parameter name and value</returns>
-Private Function GetQueryParameters(parameters As String) As Scripting.Dictionary
+Private Function GetQueryParameters(parameters As String) As Dictionary
 
     If Left$(parameters, 1) = "?" Then
         parameters = Mid$(parameters, 2)
     End If
 
-    Dim result As New Scripting.Dictionary
+    Dim result As New Dictionary
     Dim temp
     If (parameters <> "") Then
         Dim p As Variant
@@ -212,11 +215,11 @@ Private Function GetQueryParameters(parameters As String) As Scripting.Dictionar
 End Function
 
 Function HandleToken()
-    If http.status = 200 Then
+    If http.Status = 200 Then
         Dim ts As TextStream
         Set ts = fso.CreateTextFile(tokenFile, True)
-        Dim accessDict As Scripting.Dictionary
-        Set accessDict = str2dict(http.responseText)
+        Dim accessDict As Dictionary
+        Set accessDict = str2dict(http.ResponseText)
         Token = URLEncode(accessDict(OAUTH_TOKEN))
         ts.WriteLine Token
         TokenSecret = accessDict(OAUTH_TOKEN_SECRET)
@@ -230,15 +233,15 @@ Function HandleToken()
     End If
 End Function
 
-Private Function InternalSignedRequest(URL As String, hmac As Boolean, Optional method As String = "GET", Optional data As String = "", Optional ignoreExpire As Boolean = False)
+Private Function InternalSignedRequest(Url As String, hmac As Boolean, Optional Method As String = "GET", Optional data As String = "", Optional ignoreExpire As Boolean = False)
     Dim rqURL As String, parameters As String
     Dim a As IHTMLAnchorElement
     If Not ignoreExpire Then
         If TokenExpiration < Now Then RefreshToken
     End If
-    Set a = MakeURL(URL)
+    Set a = MakeURL(Url)
     Dim base As String
-    base = Me.GenerateSignatureBase(a, CONSUMER_KEY, Token, method, get_oauth_timestamp, get_oauth_nonce, hmac, rqURL, parameters)
+    base = Me.GenerateSignatureBase(a, CONSUMER_KEY, Token, Method, get_oauth_timestamp, get_oauth_nonce, hmac, rqURL, parameters)
     Dim sig As String, secrets As String
     secrets = CONSUMER_SECRET & "&" & TokenSecret
     If hmac Then
@@ -247,8 +250,8 @@ Private Function InternalSignedRequest(URL As String, hmac As Boolean, Optional 
         sig = URLEncode(secrets)
     End If
     http.SetAutoLogonPolicy AutoLogonPolicy_Always
-    http.Open UCase$(method), rqURL & "?" & parameters & "&" & OAUTH_SIGNATURE & "=" & URLEncode(sig), False
-    http.send data
+    http.Open UCase$(Method), rqURL & "?" & parameters & "&" & OAUTH_SIGNATURE & "=" & URLEncode(sig), False
+    http.Send data
     'outResponse = http.responseText
     Set InternalSignedRequest = http
 
@@ -282,16 +285,16 @@ Public Function Login()
 
 
     verifierURL = WebBrowser1.LocationURL
-    Dim verifier As Scripting.Dictionary
+    Dim verifier As Dictionary
     Set verifier = str2dict(Mid$(MakeURL(verifierURL).Search, 2))
     SignedRequest URL_ACCESS_TOKEN & "?" & OAUTH_VERIFIER & "=" & verifier(OAUTH_VERIFIER), True
     HandleToken
 End Function
 
-Function MakeURL(URL As String) As IHTMLAnchorElement
+Function MakeURL(Url As String) As IHTMLAnchorElement
     Dim a As IHTMLAnchorElement
     Set a = html.createElement("A")
-    a.href = URL
+    a.href = Url
     Set MakeURL = a
 End Function
 
@@ -301,7 +304,7 @@ End Function
 '        /// <param name="parameters">The list of parameters already sorted</param>
 '        /// <returns>a string representing the normalized parameters</returns>
 
-Friend Function NormalizeRequestParameters(SortedParameters As Scripting.Dictionary) As _
+Friend Function NormalizeRequestParameters(SortedParameters As Dictionary) As _
        String
     Dim sb As String
     Dim i As Integer
@@ -327,9 +330,9 @@ Public Function RequestToken() As String
     With MakeURL(URL_REQUEST_TOKEN)
         SignedRequest .href & "?" & OAUTH_CALLBACK & "=" & URLEncode(.Protocol & "//" & .Host & "/"), True
     End With
-    If http.status <> 200 Then GoTo RequestToken_Error
+    If http.Status <> 200 Then GoTo RequestToken_Error
     Dim response As Scripting.Dictionary
-    Set response = str2dict(http.responseText)
+    Set response = str2dict(http.ResponseText)
     Token = response(OAUTH_TOKEN)
     TokenSecret = response(OAUTH_TOKEN_SECRET)
     TokenExpiration = DateAdd("s", response(OAUTH_EXPIRES_IN), Now)
@@ -339,13 +342,27 @@ Public Function RequestToken() As String
 
 RequestToken_Error:
 
-    MsgBox "Error " & http.status & " (" & http.statusText & ") in procedure RequestToken of Class Module CoAuth" & vbCr & http.responseText
+    MsgBox "Error " & http.Status & " (" & http.StatusText & ") in procedure RequestToken of Class Module CoAuth" & vbCr & http.ResponseText
     End
 End Function
 
-Public Function SignedRequest(URL As String, hmac As Boolean, Optional method As String = "GET", Optional data As String = "")
-    Set SignedRequest = InternalSignedRequest(URL, hmac, method, data, False)
+Public Function SignedRequest(Url As String, hmac As Boolean, Optional Method As String = "GET", Optional data As String = "")
+    Set SignedRequest = InternalSignedRequest(Url, hmac, Method, data, False)
 End Function
+Public Sub Browse(Url As String)
+    Dim h As WinHttpRequest
+    Set h = SignedRequest(Url, True, "GET")
+    Dim f As String
+    f = fso.GetSpecialFolder(TemporaryFolder) & "\test.xml"
+    With fso.CreateTextFile(f, True)
+        .Write h.ResponseText
+        .Close
+    End With
+    ie.Navigate (f)
+    'ie.Document.Write h.ResponseText
+    ie.Visible = True
+End Sub
+
 
 Function SortDictionary(objDict)
     Const dictKey = 1
@@ -399,8 +416,8 @@ Function SortDictionary(objDict)
 
 End Function
 
-Function str2dict(str As String) As Scripting.Dictionary
-    Set str2dict = New Scripting.Dictionary
+Function str2dict(str As String) As Dictionary
+    Set str2dict = New Dictionary
     Dim kvs As Variant
     kvs = Split(str, "&")
     Dim i As Integer
@@ -543,11 +560,12 @@ Public Property Let resource(ByVal vNewValue As String)
 End Property
 
 Private Sub UserForm_Initialize()
+    Me.Hide
     Set http = New WinHttpRequest
     http.SetAutoLogonPolicy AutoLogonPolicy_Always
     UserForm_Resize
     tokenFile = fso.GetSpecialFolder(TemporaryFolder) & "\\" & "oauth" & guid & EXT_TOKEN
-
+    doAuth
 End Sub
 
 Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
@@ -563,9 +581,9 @@ Private Sub UserForm_Resize()
     End With
 End Sub
 
-Private Sub WebBrowser1_DocumentComplete(ByVal pDisp As Object, URL As Variant)
-    If InStr(1, URL, "oauth_verifier") > 0 Then
-        Tag = URL
+Private Sub WebBrowser1_DocumentComplete(ByVal pDisp As Object, Url As Variant)
+    If InStr(1, Url, "oauth_verifier") > 0 Then
+        Tag = Url
         Me.Hide
     End If
 End Sub
